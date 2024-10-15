@@ -4,7 +4,7 @@ import '@suiet/wallet-kit/style.css';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { SuiClient } from '@mysten/sui.js/client';
 
-const PACKAGE_ID = process.env.REACT_APP_PACKAGE_ID;
+const PACKAGE_ID = process.env.REACT_APP_PACKAGE_ID || ''; // Provide a default value
 
 const App = () => {
   const [address, setAddress] = useState('');
@@ -19,21 +19,40 @@ const App = () => {
   useEffect(() => {
     if (connected && account) {
       fetchDeeds();
+    } else {
+      setDeeds([]);
     }
   }, [connected, account]);
 
   const fetchDeeds = async () => {
+    if (!connected || !account) return;
+    
     const client = new SuiClient({ url: 'https://fullnode.testnet.sui.io:443' });
-    const ownedObjects = await client.getOwnedObjects({
-      owner: account.address,
-      filter: { StructType: `${PACKAGE_ID}::deed::RealEstateDeed` },
-    });
-    setDeeds(ownedObjects.data);
+    try {
+      const ownedObjects = await client.getOwnedObjects({
+        owner: account.address,
+        options: { showContent: true },
+      });
+      
+      const filteredDeeds = ownedObjects.data.filter(obj => 
+        obj.data?.content?.type?.includes(`${PACKAGE_ID}::deed::RealEstateDeed`)
+      );
+      
+      setDeeds(filteredDeeds);
+      console.log('Fetched deeds:', filteredDeeds);
+    } catch (error) {
+      console.error('Error fetching deeds:', error);
+      setFeedback('Error fetching deeds. Please try again.');
+    }
   };
 
   const mintDeed = async () => {
     if (!connected) {
       setFeedback('Please connect your wallet first');
+      return;
+    }
+    if (!PACKAGE_ID) {
+      setFeedback('PACKAGE_ID is not set. Please check your environment variables.');
       return;
     }
     setIsLoading(true);
